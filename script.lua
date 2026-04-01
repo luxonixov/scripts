@@ -1,3 +1,4 @@
+-- Script by luxonixov | t.me/luxonixov
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
 local RunService = game:GetService("RunService")
