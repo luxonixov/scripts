@@ -15,29 +15,10 @@ local origQuality = settings().Rendering.QualityLevel
 local currentSpeed = 24
 local slidDragging = false
 
-local function getCharHeight(char)
-    local minY, maxY = math.huge, -math.huge
-    for _, part in pairs(char:GetDescendants()) do
-        if part:IsA("BasePart") then
-            local top = part.Position.Y + part.Size.Y/2
-            local bot = part.Position.Y - part.Size.Y/2
-            if top > maxY then maxY = top end
-            if bot < minY then minY = bot end
-        end
-    end
-    return maxY == -math.huge and 0 or (maxY - minY)
-end
-
 local function isMurderer(plr)
     local char = plr.Character
     if not char then return false end
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if not hum then return false end
-    if hum.HipHeight > 3.5 then return true end
-    local root = char:FindFirstChild("HumanoidRootPart")
-    if root and root.Size.Y > 3 then return true end
-    if getCharHeight(char) > 7 then return true end
-    return false
+    return char:GetAttribute("Team") == "Killer"
 end
 
 local ScreenGui = Instance.new("ScreenGui")
@@ -59,7 +40,7 @@ ToggleBtn.Parent = ScreenGui
 Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 5)
 
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 190, 0, 390)
+Frame.Size = UDim2.new(0, 220, 0, 390)
 Frame.Position = UDim2.new(0, 10, 0, 44)
 Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
 Frame.BorderSizePixel = 0
@@ -136,7 +117,7 @@ end
 
 local function makeSmallBtn(text, x, y)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 52, 0, 22)
+    btn.Size = UDim2.new(0, 62, 0, 22)
     btn.Position = UDim2.new(0, x, 0, y)
     btn.BackgroundColor3 = Color3.fromRGB(35, 35, 60)
     btn.TextColor3 = Color3.fromRGB(170, 170, 220)
@@ -151,9 +132,9 @@ local function makeSmallBtn(text, x, y)
     return btn
 end
 
-local btn1 = makeToggle("Убрать туман",       34)
-local btn2 = makeToggle("Полное освещение",    68)
-local btn3 = makeToggle("ESP",                102)
+local btn1 = makeToggle("Убрать туман",         34)
+local btn2 = makeToggle("Полное освещение",      68)
+local btn3 = makeToggle("ESP",                  102)
 
 local modeLbl = Instance.new("TextLabel")
 modeLbl.Size = UDim2.new(1, -16, 0, 14)
@@ -167,8 +148,8 @@ modeLbl.TextXAlignment = Enum.TextXAlignment.Left
 modeLbl.Parent = Frame
 
 local btnAll  = makeSmallBtn("Все",     8,   152)
-local btnSurv = makeSmallBtn("Выжив.", 66,   152)
-local btnKill = makeSmallBtn("Убийца", 124,  152)
+local btnSurv = makeSmallBtn("Выжив.", 78,   152)
+local btnKill = makeSmallBtn("Убийца", 148,  152)
 
 local btn4 = makeToggle("Картофельная графика", 182)
 local btn5 = makeToggle("Скорость",             216)
@@ -194,7 +175,8 @@ sBg.Parent = Frame
 Instance.new("UICorner", sBg).CornerRadius = UDim.new(0, 5)
 
 local sFill = Instance.new("Frame")
-sFill.Size = UDim2.new(0.2, 0, 1, 0)
+local initX = (currentSpeed - 1) / 99
+sFill.Size = UDim2.new(initX, 0, 1, 0)
 sFill.BackgroundColor3 = Color3.fromRGB(80,120,220)
 sFill.BorderSizePixel = 0
 sFill.Parent = sBg
@@ -202,6 +184,7 @@ Instance.new("UICorner", sFill).CornerRadius = UDim.new(0, 5)
 
 local sKnob = Instance.new("Frame")
 sKnob.Size = UDim2.new(0, 16, 0, 16)
+sKnob.Position = UDim2.new(initX, -8, 0.5, -8)
 sKnob.BackgroundColor3 = Color3.fromRGB(140,180,255)
 sKnob.BorderSizePixel = 0
 sKnob.Parent = sBg
@@ -211,7 +194,7 @@ local function updateSlider(input)
     local x = math.clamp((input.Position.X - sBg.AbsolutePosition.X) / sBg.AbsoluteSize.X, 0, 1)
     sFill.Size = UDim2.new(x, 0, 1, 0)
     sKnob.Position = UDim2.new(x, -8, 0.5, -8)
-    currentSpeed = math.floor(16 + x * 84)
+    currentSpeed = math.floor(1 + x * 99)
     sLabel.Text = "Скорость: " .. currentSpeed
 end
 
@@ -274,71 +257,76 @@ local function removeESPFromPlayer(plr)
         espData[plr] = nil
     end
 end
+
 local function shouldShow(plr)
-    if states.espMode=="all" then return true end
-    local m=isMurderer(plr)
-    if states.espMode=="murderer" then return m end
-    if states.espMode=="survivors" then return not m end
+    if states.espMode == "all" then return true end
+    local m = isMurderer(plr)
+    if states.espMode == "murderer" then return m end
+    if states.espMode == "survivors" then return not m end
     return true
 end
+
 local function applyESPToPlayer(plr)
-    if plr==LocalPlayer then return end
+    if plr == LocalPlayer then return end
     removeESPFromPlayer(plr)
     if not states.esp then return end
     if not shouldShow(plr) then return end
-    local char=plr.Character
+    local char = plr.Character
     if not char then return end
-    local murder=isMurderer(plr)
-    local hl=Instance.new("Highlight")
-    hl.FillColor=murder and Color3.fromRGB(255,50,50) or Color3.fromRGB(50,120,255)
-    hl.OutlineColor=murder and Color3.fromRGB(255,180,180) or Color3.fromRGB(180,210,255)
-    hl.FillTransparency=0.35; hl.OutlineTransparency=0
-    hl.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
-    hl.Adornee=char; hl.Parent=char
-    local head=char:FindFirstChild("Head")
-    local bb,lbl
+    local murder = isMurderer(plr)
+    local hl = Instance.new("Highlight")
+    hl.FillColor = murder and Color3.fromRGB(255,50,50) or Color3.fromRGB(50,120,255)
+    hl.OutlineColor = murder and Color3.fromRGB(255,180,180) or Color3.fromRGB(180,210,255)
+    hl.FillTransparency = 0.35; hl.OutlineTransparency = 0
+    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    hl.Adornee = char; hl.Parent = char
+
+    -- ищем любую BasePart в голове если Head не найден
+    local head = char:FindFirstChild("Head") or char:FindFirstChildWhichIsA("BasePart")
+    local bb, lbl
     if head then
-        bb=Instance.new("BillboardGui")
-        bb.Size=UDim2.new(0,100,0,20); bb.StudsOffset=Vector3.new(0,3.5,0)
-        bb.AlwaysOnTop=true; bb.Parent=head
-        lbl=Instance.new("TextLabel",bb)
-        lbl.Size=UDim2.new(1,0,1,0); lbl.BackgroundTransparency=1
-        lbl.Font=Enum.Font.GothamBold; lbl.TextSize=11
-        lbl.TextColor3=murder and Color3.fromRGB(255,100,100) or Color3.fromRGB(100,180,255)
-        lbl.TextStrokeTransparency=0.3; lbl.Text="..."
+        bb = Instance.new("BillboardGui")
+        bb.Size = UDim2.new(0,100,0,20); bb.StudsOffset = Vector3.new(0,3.5,0)
+        bb.AlwaysOnTop = true; bb.Parent = head
+        lbl = Instance.new("TextLabel", bb)
+        lbl.Size = UDim2.new(1,0,1,0); lbl.BackgroundTransparency = 1
+        lbl.Font = Enum.Font.GothamBold; lbl.TextSize = 11
+        lbl.TextColor3 = murder and Color3.fromRGB(255,100,100) or Color3.fromRGB(100,180,255)
+        lbl.TextStrokeTransparency = 0.3; lbl.Text = "..."
     end
-    espData[plr]={hl=hl,bb=bb,lbl=lbl}
+    espData[plr] = {hl=hl, bb=bb, lbl=lbl}
 end
+
 local function removeAllESP()
-    for plr in pairs(espData) do removeESPFromPlayer(plr) end; espData={}
+    for plr in pairs(espData) do removeESPFromPlayer(plr) end; espData = {}
 end
 local function applyESPToAll()
     for _,plr in pairs(Players:GetPlayers()) do applyESPToPlayer(plr) end
 end
+
 btn3.MouseButton1Click:Connect(function()
-    states.esp=not states.esp; setActive(btn3,states.esp)
+    states.esp = not states.esp; setActive(btn3, states.esp)
     if states.esp then applyESPToAll() else removeAllESP() end
 end)
-btnAll.MouseButton1Click:Connect(function() states.espMode="all"; updateModeButtons(); if states.esp then removeAllESP(); applyESPToAll() end end)
+btnAll.MouseButton1Click:Connect(function()  states.espMode="all";       updateModeButtons(); if states.esp then removeAllESP(); applyESPToAll() end end)
 btnSurv.MouseButton1Click:Connect(function() states.espMode="survivors"; updateModeButtons(); if states.esp then removeAllESP(); applyESPToAll() end end)
-btnKill.MouseButton1Click:Connect(function() states.espMode="murderer"; updateModeButtons(); if states.esp then removeAllESP(); applyESPToAll() end end)
+btnKill.MouseButton1Click:Connect(function() states.espMode="murderer";  updateModeButtons(); if states.esp then removeAllESP(); applyESPToAll() end end)
 
 local function applyPotato()
-    if states.potato then settings().Rendering.QualityLevel=Enum.QualityLevel.Level01
-    else settings().Rendering.QualityLevel=origQuality end
+    if states.potato then settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+    else settings().Rendering.QualityLevel = origQuality end
 end
-btn4.MouseButton1Click:Connect(function() states.potato=not states.potato; setActive(btn4,states.potato); applyPotato() end)
+btn4.MouseButton1Click:Connect(function() states.potato = not states.potato; setActive(btn4, states.potato); applyPotato() end)
 
-btn5.MouseButton1Click:Connect(function() states.speed=not states.speed; setActive(btn5,states.speed) end)
+btn5.MouseButton1Click:Connect(function() states.speed = not states.speed; setActive(btn5, states.speed) end)
 
 RunService.Heartbeat:Connect(function()
-    if states.speed then
-        local char=LocalPlayer.Character
-        local root=char and char:FindFirstChild("HumanoidRootPart")
-        local hum=char and char:FindFirstChildOfClass("Humanoid")
-        if root and hum and hum.MoveDirection.Magnitude>0 then
-            root.CFrame=root.CFrame+(hum.MoveDirection*(currentSpeed/45))
-        end
+    if not states.speed then return end
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local hum  = char and char:FindFirstChildOfClass("Humanoid")
+    if root and hum and hum.MoveDirection.Magnitude > 0 then
+        root.CFrame = root.CFrame + (hum.MoveDirection * (currentSpeed / 45))
     end
 end)
 
@@ -372,13 +360,13 @@ local function applyAllItemESP()
     local generators = gameMap:FindFirstChild("Generators")
     if generators then
         for _, gen in pairs(generators:GetChildren()) do
-            applyHLToObject(gen, Color3.fromRGB(255, 200, 0), Color3.fromRGB(255, 240, 100))
+            applyHLToObject(gen, Color3.fromRGB(255,200,0), Color3.fromRGB(255,240,100))
         end
     end
     local batteries = gameMap:FindFirstChild("Batteries")
     if batteries then
         for _, bat in pairs(batteries:GetChildren()) do
-            applyHLToObject(bat, Color3.fromRGB(0, 220, 100), Color3.fromRGB(100, 255, 160))
+            applyHLToObject(bat, Color3.fromRGB(0,220,100), Color3.fromRGB(100,255,160))
         end
     end
 end
@@ -402,33 +390,34 @@ local function hookPlayer(plr)
         if states.esp then applyESPToPlayer(plr) end
     end)
 end
-for _,plr in pairs(Players:GetPlayers()) do if plr~=LocalPlayer then hookPlayer(plr) end end
+for _,plr in pairs(Players:GetPlayers()) do if plr ~= LocalPlayer then hookPlayer(plr) end end
 Players.PlayerAdded:Connect(hookPlayer)
 Players.PlayerRemoving:Connect(function(plr) removeESPFromPlayer(plr) end)
 
-local tickN=0
+local tickN = 0
 RunService.Heartbeat:Connect(function()
     if not states.esp then return end
-    tickN=tickN+1
-    local myChar=LocalPlayer.Character
-    local myRoot=myChar and myChar:FindFirstChild("HumanoidRootPart")
-    for plr,data in pairs(espData) do
-        local c=plr.Character
-        local head=c and c:FindFirstChild("Head")
-        if head and myRoot then
-            local dist=(head.Position-myRoot.Position).Magnitude
-            local murder=isMurderer(plr)
-            if tickN%45==0 then
+    tickN = tickN + 1
+    local myChar = LocalPlayer.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    for plr, data in pairs(espData) do
+        local c = plr.Character
+        if not c then continue end
+        local anyPart = c:FindFirstChild("Head") or c:FindFirstChildWhichIsA("BasePart")
+        if anyPart and myRoot then
+            local dist = (anyPart.Position - myRoot.Position).Magnitude
+            local murder = isMurderer(plr)
+            if tickN % 45 == 0 then
                 if data.hl then
-                    data.hl.FillColor=murder and Color3.fromRGB(255,50,50) or Color3.fromRGB(50,120,255)
-                    data.hl.OutlineColor=murder and Color3.fromRGB(255,180,180) or Color3.fromRGB(180,210,255)
+                    data.hl.FillColor    = murder and Color3.fromRGB(255,50,50)   or Color3.fromRGB(50,120,255)
+                    data.hl.OutlineColor = murder and Color3.fromRGB(255,180,180) or Color3.fromRGB(180,210,255)
                 end
                 if data.lbl then
-                    data.lbl.TextColor3=murder and Color3.fromRGB(255,100,100) or Color3.fromRGB(100,180,255)
+                    data.lbl.TextColor3 = murder and Color3.fromRGB(255,100,100) or Color3.fromRGB(100,180,255)
                 end
             end
             if data.lbl then
-                data.lbl.Text=(murder and "[!] " or "")..math.floor(dist).." std"
+                data.lbl.Text = (murder and "[!] " or "") .. math.floor(dist) .. " std"
             end
         end
     end
