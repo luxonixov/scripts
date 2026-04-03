@@ -4,10 +4,7 @@ end
 
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
-local Highlight =
-	loadstring(
-		game:HttpGet("https://github.com/exxtremestuffs/SimpleSpySource/raw/master/highlight.lua")
-	)()
+local Highlight = loadstring(game:HttpGet("https://github.com/exxtremestuffs/SimpleSpySource/raw/master/highlight.lua"))()
 
 local SimpleSpy2 = Instance.new("ScreenGui")
 local Background = Instance.new("Frame")
@@ -170,7 +167,7 @@ Text_2.TextWrapped = true
 Button_2.Name = "Button"
 Button_2.Parent = FunctionTemplate
 Button_2.BackgroundColor3 = Color3.new(0, 0, 0)
-Button_2.BackgroundTransparency = 0.69999998807907
+Button_2.BackgroundTransparency = 0.7
 Button_2.BorderColor3 = Color3.new(1, 1, 1)
 Button_2.Position = UDim2.new(0, 5, 0, 8)
 Button_2.Size = UDim2.new(0, 74, 0, 16)
@@ -185,6 +182,7 @@ TopBar.Parent = Background
 TopBar.BackgroundColor3 = Color3.fromRGB(37, 35, 38)
 TopBar.BorderSizePixel = 0
 TopBar.Size = UDim2.new(0, 380, 0, 16)
+TopBar.Active = true
 
 Simple.Name = "Simple"
 Simple.Parent = TopBar
@@ -277,7 +275,6 @@ TextLabel.TextXAlignment = Enum.TextXAlignment.Left
 TextLabel.TextYAlignment = Enum.TextYAlignment.Top
 
 -------------------------------------------------------------------------------
--- init
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
@@ -285,8 +282,6 @@ local ContentProvider = game:GetService("ContentProvider")
 local TextService = game:GetService("TextService")
 local Mouse
 
-local selectedColor = Color3.new(0.321569, 0.333333, 1)
-local deselectedColor = Color3.new(0.8, 0.8, 0.8)
 local layoutOrderNum = 999999999
 local mainClosing = false
 local closed = false
@@ -297,7 +292,6 @@ local logs = {}
 local selected = nil
 local blacklist = {}
 local blocklist = {}
-local getNil = false
 local connectedRemotes = {}
 local toggle = false
 local gm
@@ -320,20 +314,45 @@ local rightFadeIn
 local codebox
 local p
 local getnilrequired = false
-
 local autoblock = false
 local history = {}
 local excluding = {}
-
 local funcEnabled = true
 local remoteSignals = {}
 local remoteHooks = {}
 local oldIcon
-local mouseInGui = false
 local connections = {}
 local useGetCallingScript = false
 local keyToString = false
 local recordReturnValues = false
+
+-- drag полностью переписан без кастомного курсора
+local dragActive = false
+local dragStart = nil
+local dragStartPos = nil
+
+local function startDrag(input)
+	dragActive = true
+	dragStart = input.Position
+	dragStartPos = Background.AbsolutePosition
+end
+
+local function updateDrag(input)
+	if not dragActive then return end
+	local delta = input.Position - dragStart
+	local newX = dragStartPos.X + delta.X
+	local newY = dragStartPos.Y + delta.Y
+	local vp = workspace.CurrentCamera.ViewportSize
+	local w = sideClosed and 110 or Background.AbsoluteSize.X
+	local h = closed and 16 or Background.AbsoluteSize.Y
+	newX = math.clamp(newX, 0, vp.X - w)
+	newY = math.clamp(newY, 0, vp.Y - h - 36)
+	Background.Position = UDim2.new(0, newX, 0, newY)
+end
+
+local function stopDrag()
+	dragActive = false
+end
 
 function SimpleSpy:ArgsToString(method, args)
 	assert(typeof(method) == "string", "string expected, got " .. typeof(method))
@@ -352,9 +371,7 @@ function SimpleSpy:ValueToVar(value, variablename)
 	return v2v({ [variablename] = value })
 end
 
-function SimpleSpy:ValueToString(value)
-	return v2s(value)
-end
+function SimpleSpy:ValueToString(value) return v2s(value) end
 
 function SimpleSpy:GetFunctionInfo(func)
 	assert(typeof(func) == "function", "Instance expected, got " .. typeof(func))
@@ -436,11 +453,8 @@ function scaleToolTip()
 end
 
 function onToggleButtonHover()
-	if not toggle then
-		TweenService:Create(Simple, TweenInfo.new(0.5), { TextColor3 = Color3.fromRGB(252, 51, 51) }):Play()
-	else
-		TweenService:Create(Simple, TweenInfo.new(0.5), { TextColor3 = Color3.fromRGB(68, 206, 91) }):Play()
-	end
+	if not toggle then TweenService:Create(Simple, TweenInfo.new(0.5), { TextColor3 = Color3.fromRGB(252, 51, 51) }):Play()
+	else TweenService:Create(Simple, TweenInfo.new(0.5), { TextColor3 = Color3.fromRGB(68, 206, 91) }):Play() end
 end
 
 function onToggleButtonUnhover()
@@ -456,11 +470,8 @@ function onXButtonUnhover()
 end
 
 function onToggleButtonClick()
-	if toggle then
-		TweenService:Create(Simple, TweenInfo.new(0.5), { TextColor3 = Color3.fromRGB(252, 51, 51) }):Play()
-	else
-		TweenService:Create(Simple, TweenInfo.new(0.5), { TextColor3 = Color3.fromRGB(68, 206, 91) }):Play()
-	end
+	if toggle then TweenService:Create(Simple, TweenInfo.new(0.5), { TextColor3 = Color3.fromRGB(252, 51, 51) }):Play()
+	else TweenService:Create(Simple, TweenInfo.new(0.5), { TextColor3 = Color3.fromRGB(68, 206, 91) }):Play() end
 	toggleSpyMethod()
 end
 
@@ -480,46 +491,15 @@ function bringBackOnResize()
 	local currentX = Background.AbsolutePosition.X
 	local currentY = Background.AbsolutePosition.Y
 	local viewportSize = workspace.CurrentCamera.ViewportSize
-	if (currentX < 0) or (currentX > (viewportSize.X - (sideClosed and 110 or Background.AbsoluteSize.X))) then
-		if currentX < 0 then currentX = 0
-		else currentX = viewportSize.X - (sideClosed and 110 or Background.AbsoluteSize.X) end
+	if currentX < 0 then currentX = 0
+	elseif currentX > viewportSize.X - (sideClosed and 110 or Background.AbsoluteSize.X) then
+		currentX = viewportSize.X - (sideClosed and 110 or Background.AbsoluteSize.X)
 	end
-	if (currentY < 0) or (currentY > (viewportSize.Y - (closed and 16 or Background.AbsoluteSize.Y) - 36)) then
-		if currentY < 0 then currentY = 0
-		else currentY = viewportSize.Y - (closed and 16 or Background.AbsoluteSize.Y) - 36 end
+	if currentY < 0 then currentY = 0
+	elseif currentY > viewportSize.Y - (closed and 16 or Background.AbsoluteSize.Y) - 36 then
+		currentY = viewportSize.Y - (closed and 16 or Background.AbsoluteSize.Y) - 36
 	end
 	TweenService:Create(Background, TweenInfo.new(0.1), { Position = UDim2.new(0, currentX, 0, currentY) }):Play()
-end
-
-function onBarInput(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		local lastPos = UserInputService:GetMouseLocation()
-		local mainPos = Background.AbsolutePosition
-		local offset = mainPos - lastPos
-		local currentPos = offset + lastPos
-		RunService:BindToRenderStep("drag", 1, function()
-			local newPos = UserInputService:GetMouseLocation()
-			if newPos ~= lastPos then
-				local currentX = (offset + newPos).X
-				local currentY = (offset + newPos).Y
-				local viewportSize = workspace.CurrentCamera.ViewportSize
-				if (currentX < 0 and currentX < currentPos.X) or (currentX > (viewportSize.X - (sideClosed and 110 or TopBar.AbsoluteSize.X)) and currentX > currentPos.X) then
-					if currentX < 0 then currentX = 0
-					else currentX = viewportSize.X - (sideClosed and 110 or TopBar.AbsoluteSize.X) end
-				end
-				if (currentY < 0 and currentY < currentPos.Y) or (currentY > (viewportSize.Y - (closed and 16 or Background.AbsoluteSize.Y) - 36) and currentY > currentPos.Y) then
-					if currentY < 0 then currentY = 0
-					else currentY = viewportSize.Y - (closed and 16 or Background.AbsoluteSize.Y) - 36 end
-				end
-				currentPos = Vector2.new(currentX, currentY)
-				lastPos = newPos
-				TweenService:Create(Background, TweenInfo.new(0.05), { Position = UDim2.new(0, currentPos.X, 0, currentPos.Y) }):Play()
-			end
-		end)
-		table.insert(connections, UserInputService.InputEnded:Connect(function(inputE)
-			if input == inputE then RunService:UnbindFromRenderStep("drag") end
-		end))
-	end
 end
 
 function fadeOut(elements)
@@ -655,95 +635,24 @@ function isInResizeRange(p)
 	return false
 end
 
-function isInDragRange(p)
-	local relativeP = p - Background.AbsolutePosition
-	if relativeP.X <= TopBar.AbsoluteSize.X - CloseButton.AbsoluteSize.X * 3 and relativeP.X >= 0 and relativeP.Y <= TopBar.AbsoluteSize.Y and relativeP.Y >= 0 then
-		return true
-	end
-	return false
-end
-
-function mouseEntered()
-	local existingCursor = SimpleSpy2:FindFirstChild("Cursor")
-	while existingCursor do
-		existingCursor:Destroy()
-		existingCursor = SimpleSpy2:FindFirstChild("Cursor")
-	end
-	local customCursor = Instance.new("ImageLabel")
-	customCursor.Name = "Cursor"
-customCursor.Size = UDim2.fromOffset(200, 200)
-customCursor.ZIndex = 1e5
-customCursor.BackgroundTransparency = 1
-customCursor.Active = false
-customCursor.Selectable = false
-customCursor.Image = ""
-customCursor.Parent = SimpleSpy2	UserInputService.OverrideMouseIconBehavior = Enum.OverrideMouseIconBehavior.ForceHide
-	RunService:BindToRenderStep("SIMPLESPY_CURSOR", 1, function()
-		if mouseInGui and _G.SimpleSpyExecuted then
-			local mouseLocation = UserInputService:GetMouseLocation() - Vector2.new(0, 36)
-			customCursor.Position = UDim2.fromOffset(mouseLocation.X - customCursor.AbsoluteSize.X / 2, mouseLocation.Y - customCursor.AbsoluteSize.Y / 2)
-			local inRange, type = isInResizeRange(mouseLocation)
-			if inRange and not sideClosed and not closed then
-				customCursor.Image = type == "B" and "rbxassetid://6065821980" or type == "X" and "rbxassetid://6065821086" or "rbxassetid://6065821596"
-			elseif inRange and not closed and type == "Y" or type == "B" then
-				customCursor.Image = "rbxassetid://6065821596"
-			elseif customCursor.Image ~= "rbxassetid://6065775281" then
-				customCursor.Image = "rbxassetid://6065775281"
-			end
-		else
-			UserInputService.OverrideMouseIconBehavior = Enum.OverrideMouseIconBehavior.None
-			customCursor:Destroy()
-			RunService:UnbindFromRenderStep("SIMPLESPY_CURSOR")
-		end
-	end)
-end
-
-function mouseMoved()
-	local mousePos = UserInputService:GetMouseLocation() - Vector2.new(0, 36)
-	if not closed and mousePos.X >= TopBar.AbsolutePosition.X and mousePos.X <= TopBar.AbsolutePosition.X + TopBar.AbsoluteSize.X and mousePos.Y >= Background.AbsolutePosition.Y and mousePos.Y <= Background.AbsolutePosition.Y + Background.AbsoluteSize.Y then
-		if not mouseInGui then mouseInGui = true; mouseEntered() end
-	else
-		mouseInGui = false
-	end
-end
-
-function maximizeSize(speed)
-	if not speed then speed = 0.05 end
-	TweenService:Create(LeftPanel, TweenInfo.new(speed), { Size = UDim2.fromOffset(LeftPanel.AbsoluteSize.X, Background.AbsoluteSize.Y - TopBar.AbsoluteSize.Y) }):Play()
-	TweenService:Create(RightPanel, TweenInfo.new(speed), { Size = UDim2.fromOffset(Background.AbsoluteSize.X - LeftPanel.AbsoluteSize.X, Background.AbsoluteSize.Y - TopBar.AbsoluteSize.Y) }):Play()
-	TweenService:Create(TopBar, TweenInfo.new(speed), { Size = UDim2.fromOffset(Background.AbsoluteSize.X, TopBar.AbsoluteSize.Y) }):Play()
-	TweenService:Create(ScrollingFrame, TweenInfo.new(speed), { Size = UDim2.fromOffset(Background.AbsoluteSize.X - LeftPanel.AbsoluteSize.X, 100), Position = UDim2.fromOffset(0, Background.AbsoluteSize.Y - 108 - TopBar.AbsoluteSize.Y) }):Play()
-	TweenService:Create(CodeBox, TweenInfo.new(speed), { Size = UDim2.fromOffset(Background.AbsoluteSize.X - LeftPanel.AbsoluteSize.X, Background.AbsoluteSize.Y - 108 - TopBar.AbsoluteSize.Y) }):Play()
-	TweenService:Create(LogList, TweenInfo.new(speed), { Size = UDim2.fromOffset(LogList.AbsoluteSize.X, Background.AbsoluteSize.Y - TopBar.AbsoluteSize.Y - 14) }):Play()
-end
-
-function minimizeSize(speed)
-	if not speed then speed = 0.05 end
-	TweenService:Create(LeftPanel, TweenInfo.new(speed), { Size = UDim2.fromOffset(LeftPanel.AbsoluteSize.X, Background.AbsoluteSize.Y - TopBar.AbsoluteSize.Y) }):Play()
-	TweenService:Create(RightPanel, TweenInfo.new(speed), { Size = UDim2.fromOffset(0, Background.AbsoluteSize.Y - TopBar.AbsoluteSize.Y) }):Play()
-	TweenService:Create(TopBar, TweenInfo.new(speed), { Size = UDim2.fromOffset(LeftPanel.AbsoluteSize.X, TopBar.AbsoluteSize.Y) }):Play()
-	TweenService:Create(ScrollingFrame, TweenInfo.new(speed), { Size = UDim2.fromOffset(0, 108), Position = UDim2.fromOffset(0, Background.AbsoluteSize.Y - 108 - TopBar.AbsoluteSize.Y) }):Play()
-	TweenService:Create(CodeBox, TweenInfo.new(speed), { Size = UDim2.fromOffset(0, Background.AbsoluteSize.Y - 108 - TopBar.AbsoluteSize.Y) }):Play()
-	TweenService:Create(LogList, TweenInfo.new(speed), { Size = UDim2.fromOffset(LogList.AbsoluteSize.X, Background.AbsoluteSize.Y - TopBar.AbsoluteSize.Y - 14) }):Play()
-end
-
 function validateSize()
 	local x, y = Background.AbsoluteSize.X, Background.AbsoluteSize.Y
 	local screenSize = workspace.CurrentCamera.ViewportSize
 	if x + Background.AbsolutePosition.X > screenSize.X then
-		if screenSize.X - Background.AbsolutePosition.X >= 380 then x = screenSize.X - Background.AbsolutePosition.X
-		else x = 380 end
-	elseif y + Background.AbsolutePosition.Y > screenSize.Y then
-		if screenSize.X - Background.AbsolutePosition.Y >= 230 then y = screenSize.Y - Background.AbsolutePosition.Y
-		else y = 230 end
+		x = math.max(screenSize.X - Background.AbsolutePosition.X, 380)
+	end
+	if y + Background.AbsolutePosition.Y > screenSize.Y then
+		y = math.max(screenSize.Y - Background.AbsolutePosition.Y, 230)
 	end
 	Background.Size = UDim2.fromOffset(x, y)
 end
 
 function backgroundUserInput(input)
+	if input.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
 	local mousePos = UserInputService:GetMouseLocation() - Vector2.new(0, 36)
-	local inResizeRange, type = isInResizeRange(mousePos)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 and inResizeRange then
+	local inResizeRange, resizeType = isInResizeRange(mousePos)
+
+	if inResizeRange then
 		local lastPos = UserInputService:GetMouseLocation()
 		local offset = Background.AbsoluteSize - lastPos
 		local currentPos = lastPos + offset
@@ -756,8 +665,8 @@ function backgroundUserInput(input)
 				if currentY < 230 then currentY = 230 end
 				currentPos = Vector2.new(currentX, currentY)
 				Background.Size = UDim2.fromOffset(
-					(not sideClosed and not closed and (type == "X" or type == "B")) and currentPos.X or Background.AbsoluteSize.X,
-					(not closed and (type == "Y" or type == "B")) and currentPos.Y or Background.AbsoluteSize.Y
+					(not sideClosed and not closed and (resizeType == "X" or resizeType == "B")) and currentPos.X or Background.AbsoluteSize.X,
+					(not closed and (resizeType == "Y" or resizeType == "B")) and currentPos.Y or Background.AbsoluteSize.Y
 				)
 				validateSize()
 				if sideClosed then minimizeSize() else maximizeSize() end
@@ -767,14 +676,12 @@ function backgroundUserInput(input)
 		table.insert(connections, UserInputService.InputEnded:Connect(function(inputE)
 			if input == inputE then RunService:UnbindFromRenderStep("SIMPLESPY_RESIZE") end
 		end))
-	elseif isInDragRange(mousePos) then
-		onBarInput(input)
-	end
-end
-
-function getPlayerFromInstance(instance)
-	for _, v in pairs(Players:GetPlayers()) do
-		if v.Character and (instance:IsDescendantOf(v.Character) or instance == v.Character) then return v end
+	else
+		-- drag zone: topbar minus кнопки справа
+		local relativeP = mousePos - Background.AbsolutePosition
+		if relativeP.X >= 0 and relativeP.X <= TopBar.AbsoluteSize.X - 48 and relativeP.Y >= 0 and relativeP.Y <= TopBar.AbsoluteSize.Y then
+			startDrag(input)
+		end
 	end
 end
 
@@ -806,6 +713,7 @@ function makeToolTip(enable, text)
 		if ToolTip.Visible then ToolTip.Visible = false; RunService:UnbindFromRenderStep("ToolTip") end
 		local first = true
 		RunService:BindToRenderStep("ToolTip", 1, function()
+			if not Mouse then return end
 			local topLeft = Vector2.new(Mouse.X + 20, Mouse.Y + 20)
 			local bottomRight = topLeft + ToolTip.AbsoluteSize
 			if topLeft.X < 0 then topLeft = Vector2.new(0, topLeft.Y)
@@ -970,7 +878,7 @@ end
 
 function k2s(v, ...)
 	if keyToString then
-		if typeof(v) == "userdata" and getrawmetatable(v) then return string.format('"<void> (%s)" --[[Potentially hidden data (tostring in SimpleSpy:HookRemote/GetRemoteFiredSignal at your own risk)]]', safetostring(v))
+		if typeof(v) == "userdata" and getrawmetatable(v) then return string.format('"<void> (%s)" --[[Potentially hidden data]]', safetostring(v))
 		elseif typeof(v) == "userdata" then return string.format('"<void> (%s)"', safetostring(v))
 		elseif type(v) == "userdata" and typeof(v) ~= "Instance" then return string.format('"<%s> (%s)"', typeof(v), tostring(v))
 		elseif type(v) == "function" then return string.format('"<Function> (%s)"', tostring(v)) end
@@ -1108,7 +1016,7 @@ end
 function formatstr(s, indentation)
 	if not indentation then indentation = 0 end
 	local handled, reachedMax = handlespecials(s, indentation)
-	return '"' .. handled .. '"' .. (reachedMax and " --[[ MAXIMUM STRING SIZE REACHED, CHANGE '_G.SimpleSpyMaxStringSize' TO ADJUST MAXIMUM SIZE ]]" or "")
+	return '"' .. handled .. '"' .. (reachedMax and " --[[ MAXIMUM STRING SIZE REACHED ]]" or "")
 end
 
 function handlespecials(value, indentation)
@@ -1196,6 +1104,26 @@ function taskscheduler()
 		table.remove(scheduled, 1)
 		if type(currentf) == "table" and type(currentf[1]) == "function" then pcall(unpack(currentf)) end
 	end
+end
+
+function maximizeSize(speed)
+	if not speed then speed = 0.05 end
+	TweenService:Create(LeftPanel, TweenInfo.new(speed), { Size = UDim2.fromOffset(LeftPanel.AbsoluteSize.X, Background.AbsoluteSize.Y - TopBar.AbsoluteSize.Y) }):Play()
+	TweenService:Create(RightPanel, TweenInfo.new(speed), { Size = UDim2.fromOffset(Background.AbsoluteSize.X - LeftPanel.AbsoluteSize.X, Background.AbsoluteSize.Y - TopBar.AbsoluteSize.Y) }):Play()
+	TweenService:Create(TopBar, TweenInfo.new(speed), { Size = UDim2.fromOffset(Background.AbsoluteSize.X, TopBar.AbsoluteSize.Y) }):Play()
+	TweenService:Create(ScrollingFrame, TweenInfo.new(speed), { Size = UDim2.fromOffset(Background.AbsoluteSize.X - LeftPanel.AbsoluteSize.X, 100), Position = UDim2.fromOffset(0, Background.AbsoluteSize.Y - 108 - TopBar.AbsoluteSize.Y) }):Play()
+	TweenService:Create(CodeBox, TweenInfo.new(speed), { Size = UDim2.fromOffset(Background.AbsoluteSize.X - LeftPanel.AbsoluteSize.X, Background.AbsoluteSize.Y - 108 - TopBar.AbsoluteSize.Y) }):Play()
+	TweenService:Create(LogList, TweenInfo.new(speed), { Size = UDim2.fromOffset(LogList.AbsoluteSize.X, Background.AbsoluteSize.Y - TopBar.AbsoluteSize.Y - 14) }):Play()
+end
+
+function minimizeSize(speed)
+	if not speed then speed = 0.05 end
+	TweenService:Create(LeftPanel, TweenInfo.new(speed), { Size = UDim2.fromOffset(LeftPanel.AbsoluteSize.X, Background.AbsoluteSize.Y - TopBar.AbsoluteSize.Y) }):Play()
+	TweenService:Create(RightPanel, TweenInfo.new(speed), { Size = UDim2.fromOffset(0, Background.AbsoluteSize.Y - TopBar.AbsoluteSize.Y) }):Play()
+	TweenService:Create(TopBar, TweenInfo.new(speed), { Size = UDim2.fromOffset(LeftPanel.AbsoluteSize.X, TopBar.AbsoluteSize.Y) }):Play()
+	TweenService:Create(ScrollingFrame, TweenInfo.new(speed), { Size = UDim2.fromOffset(0, 108), Position = UDim2.fromOffset(0, Background.AbsoluteSize.Y - 108 - TopBar.AbsoluteSize.Y) }):Play()
+	TweenService:Create(CodeBox, TweenInfo.new(speed), { Size = UDim2.fromOffset(0, Background.AbsoluteSize.Y - 108 - TopBar.AbsoluteSize.Y) }):Play()
+	TweenService:Create(LogList, TweenInfo.new(speed), { Size = UDim2.fromOffset(LogList.AbsoluteSize.X, Background.AbsoluteSize.Y - TopBar.AbsoluteSize.Y - 14) }):Play()
 end
 
 function remoteHandler(hookfunction, methodName, remote, args, funcInfo, calling, returnValue)
@@ -1315,10 +1243,7 @@ function toggleSpy()
 		originalFunction = hookfunction(remoteFunction.InvokeServer, newInvokeServer)
 	else
 		if hookmetamethod then if original then hookmetamethod(game, "__namecall", original) end
-		else
-			gm = gm or getrawmetatable(game)
-			setreadonly(gm, false); gm.__namecall = original; setreadonly(gm, true)
-		end
+		else gm = gm or getrawmetatable(game); setreadonly(gm, false); gm.__namecall = original; setreadonly(gm, true) end
 		hookfunction(remoteEvent.FireServer, originalEvent)
 		hookfunction(remoteFunction.InvokeServer, originalFunction)
 	end
@@ -1333,10 +1258,7 @@ function shutdown()
 	hookfunction(remoteEvent.FireServer, originalEvent)
 	hookfunction(remoteFunction.InvokeServer, originalFunction)
 	if hookmetamethod then if original then hookmetamethod(game, "__namecall", original) end
-	else
-		gm = gm or getrawmetatable(game)
-		setreadonly(gm, false); gm.__namecall = original; setreadonly(gm, true)
-	end
+	else gm = gm or getrawmetatable(game); setreadonly(gm, false); gm.__namecall = original; setreadonly(gm, true) end
 	_G.SimpleSpyExecuted = false
 end
 
@@ -1350,7 +1272,7 @@ if not _G.SimpleSpyExecuted then
 			if getrawmetatable and not getrawmetatable(game).__namecall then table.insert(missing, "getrawmetatable(game).__namecall") end
 			if not setreadonly then table.insert(missing, "setreadonly") end
 			shutdown()
-			error("This environment does not support method hooks!\n(Your exploit is not capable of running SimpleSpy)\nMissing: " .. table.concat(missing, ", "))
+			error("This environment does not support method hooks!\nMissing: " .. table.concat(missing, ", "))
 		end
 		_G.SimpleSpyShutdown = shutdown
 		ContentProvider:PreloadAsync({ "rbxassetid://6065821980", "rbxassetid://6065774948", "rbxassetid://6065821086", "rbxassetid://6065821596", ImageLabel, ImageLabel_2, ImageLabel_3 })
@@ -1364,7 +1286,6 @@ if not _G.SimpleSpyExecuted then
 			for _, v in pairs(getnilinstances()) do if v.ClassName == class and v.Name == name then return v end end
 		end
 		TextLabel:GetPropertyChangedSignal("Text"):Connect(scaleToolTip)
-		TopBar.InputBegan:Connect(onBarInput)
 		MinimizeButton.MouseButton1Click:Connect(toggleMinimize)
 		MaximizeButton.MouseButton1Click:Connect(toggleSideTray)
 		Simple.MouseButton1Click:Connect(onToggleButtonClick)
@@ -1373,7 +1294,32 @@ if not _G.SimpleSpyExecuted then
 		Simple.MouseEnter:Connect(onToggleButtonHover)
 		Simple.MouseLeave:Connect(onToggleButtonUnhover)
 		CloseButton.MouseButton1Click:Connect(shutdown)
-		table.insert(connections, UserInputService.InputBegan:Connect(backgroundUserInput))
+
+		-- drag через UserInputService глобально, без кастомного курсора
+		table.insert(connections, UserInputService.InputBegan:Connect(function(input)
+			if input.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
+			local mousePos = UserInputService:GetMouseLocation() - Vector2.new(0, 36)
+			local relativeP = mousePos - Background.AbsolutePosition
+			local inResize = isInResizeRange(mousePos)
+			if not inResize and relativeP.X >= 0 and relativeP.X <= TopBar.AbsoluteSize.X - 50 and relativeP.Y >= 0 and relativeP.Y <= TopBar.AbsoluteSize.Y then
+				startDrag(input)
+			elseif inResize then
+				backgroundUserInput(input)
+			end
+		end))
+
+		table.insert(connections, UserInputService.InputChanged:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseMovement then
+				updateDrag(input)
+			end
+		end))
+
+		table.insert(connections, UserInputService.InputEnded:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 then
+				stopDrag()
+			end
+		end))
+
 		connectResize()
 		SimpleSpy2.Enabled = true
 		coroutine.wrap(function() wait(1); onToggleButtonUnhover() end)()
@@ -1385,10 +1331,9 @@ if not _G.SimpleSpyExecuted then
 		if not Players.LocalPlayer then Players:GetPropertyChangedSignal("LocalPlayer"):Wait() end
 		Mouse = Players.LocalPlayer:GetMouse()
 		oldIcon = Mouse.Icon
-		table.insert(connections, Mouse.Move:Connect(mouseMoved))
 	end)
 	if not succeeded then
-		warn("A fatal error has occured, SimpleSpy was unable to launch properly.\nPlease DM this error message to @exx#9394:\n\n" .. tostring(err))
+		warn("A fatal error has occured, SimpleSpy was unable to launch properly.\n\n" .. tostring(err))
 		SimpleSpy2:Destroy()
 		hookfunction(remoteEvent.FireServer, originalEvent)
 		hookfunction(remoteFunction.InvokeServer, originalFunction)
@@ -1405,60 +1350,53 @@ newButton("Copy Code", function() return "Click to copy code" end, function() se
 newButton("Copy Remote", function() return "Click to copy the path of the remote" end, function() if selected then setclipboard(v2s(selected.Remote.remote)); TextLabel.Text = "Copied!" end end)
 newButton("Run Code", function() return "Click to execute code" end, function()
 	TextLabel.Text = "Executing..."
-	local succeeded = pcall(function() return loadstring(codebox:getString())() end)
-	if succeeded then TextLabel.Text = "Executed successfully!" else TextLabel.Text = "Execution error!" end
+	local ok = pcall(function() return loadstring(codebox:getString())() end)
+	TextLabel.Text = ok and "Executed successfully!" or "Execution error!"
 end)
-newButton("Get Script", function() return "Click to copy calling script to clipboard\nWARNING: Not super reliable, nil == could not find" end, function() if selected then setclipboard(SimpleSpy:ValueToString(selected.Source)); TextLabel.Text = "Done!" end end)
-newButton("Function Info", function() return "Click to view calling function information" end, function()
+newButton("Get Script", function() return "Click to copy calling script\nWARNING: Not super reliable" end, function() if selected then setclipboard(SimpleSpy:ValueToString(selected.Source)); TextLabel.Text = "Done!" end end)
+newButton("Function Info", function() return "Click to view calling function info" end, function()
 	if selected then
 		if selected.Function then codebox:setRaw("-- Calling function info\n-- Generated by the SimpleSpy serializer\n\n" .. tostring(selected.Function)) end
-		TextLabel.Text = "Done! Function info generated by the SimpleSpy Serializer."
+		TextLabel.Text = "Done!"
 	end
 end)
 newButton("Clr Logs", function() return "Click to clear logs" end, function()
-	TextLabel.Text = "Clearing..."
 	logs = {}
 	for _, v in pairs(LogList:GetChildren()) do if not v:IsA("UIListLayout") then v:Destroy() end end
 	codebox:setRaw(""); selected = nil; TextLabel.Text = "Logs cleared!"
 end)
-newButton("Exclude (i)", function() return "Click to exclude this Remote.\nExcluding a remote makes SimpleSpy ignore it, but it will continue to be usable." end, function() if selected then blacklist[selected.Remote.remote] = true; TextLabel.Text = "Excluded!" end end)
-newButton("Exclude (n)", function() return "Click to exclude all remotes with this name.\nExcluding a remote makes SimpleSpy ignore it, but it will continue to be usable." end, function() if selected then blacklist[selected.Name] = true; TextLabel.Text = "Excluded!" end end)
-newButton("Clr Blacklist", function() return "Click to clear the blacklist." end, function() blacklist = {}; TextLabel.Text = "Blacklist cleared!" end)
-newButton("Block (i)", function() return "Click to stop this remote from firing." end, function()
+newButton("Exclude (i)", function() return "Exclude this remote instance" end, function() if selected then blacklist[selected.Remote.remote] = true; TextLabel.Text = "Excluded!" end end)
+newButton("Exclude (n)", function() return "Exclude all remotes with this name" end, function() if selected then blacklist[selected.Name] = true; TextLabel.Text = "Excluded!" end end)
+newButton("Clr Blacklist", function() return "Clear the blacklist" end, function() blacklist = {}; TextLabel.Text = "Blacklist cleared!" end)
+newButton("Block (i)", function() return "Block this remote from firing" end, function()
 	if selected then
 		if selected.Remote.remote then blocklist[selected.Remote.remote] = true; TextLabel.Text = "Blocked!"
-		else TextLabel.Text = "Error! Instance may no longer exist, try using Block (n)." end
+		else TextLabel.Text = "Error! Try Block (n)." end
 	end
 end)
-newButton("Block (n)", function() return "Click to stop remotes with this name from firing." end, function() if selected then blocklist[selected.Name] = true; TextLabel.Text = "Blocked!" end end)
-newButton("Clr Blocklist", function() return "Click to stop blocking remotes." end, function() blocklist = {}; TextLabel.Text = "Blocklist cleared!" end)
-newButton("Decompile", function() return "Attempts to decompile source script\nWARNING: Not super reliable" end, function()
+newButton("Block (n)", function() return "Block remotes with this name" end, function() if selected then blocklist[selected.Name] = true; TextLabel.Text = "Blocked!" end end)
+newButton("Clr Blocklist", function() return "Clear the blocklist" end, function() blocklist = {}; TextLabel.Text = "Blocklist cleared!" end)
+newButton("Decompile", function() return "Attempts to decompile source script" end, function()
 	if selected then
 		if selected.Source then codebox:setRaw(decompile(selected.Source)); TextLabel.Text = "Done!"
 		else TextLabel.Text = "Source not found!" end
 	end
 end)
-newButton("Disable Info", function() return string.format("[%s] Toggle function info", funcEnabled and "ENABLED" or "DISABLED") end, function()
-	funcEnabled = not funcEnabled
-	TextLabel.Text = string.format("[%s] Toggle function info", funcEnabled and "ENABLED" or "DISABLED")
+newButton("Disable Info", function() return string.format("[%s] Toggle function info", funcEnabled and "ON" or "OFF") end, function()
+	funcEnabled = not funcEnabled; TextLabel.Text = string.format("[%s] Function info", funcEnabled and "ON" or "OFF")
 end)
-newButton("Autoblock", function() return string.format("[%s] [BETA] Intelligently detects and excludes spammy remote calls", autoblock and "ENABLED" or "DISABLED") end, function()
-	autoblock = not autoblock
-	TextLabel.Text = string.format("[%s] Autoblock", autoblock and "ENABLED" or "DISABLED")
-	history = {}; excluding = {}
+newButton("Autoblock", function() return string.format("[%s] Autoblock spammy remotes", autoblock and "ON" or "OFF") end, function()
+	autoblock = not autoblock; history = {}; excluding = {}; TextLabel.Text = string.format("[%s] Autoblock", autoblock and "ON" or "OFF")
 end)
-newButton("CallingScript", function() return string.format("[%s] [UNSAFE] Uses getcallingscript", useGetCallingScript and "ENABLED" or "DISABLED") end, function()
-	useGetCallingScript = not useGetCallingScript
-	TextLabel.Text = string.format("[%s] CallingScript", useGetCallingScript and "ENABLED" or "DISABLED")
+newButton("CallingScript", function() return string.format("[%s] Use getcallingscript (UNSAFE)", useGetCallingScript and "ON" or "OFF") end, function()
+	useGetCallingScript = not useGetCallingScript; TextLabel.Text = string.format("[%s] CallingScript", useGetCallingScript and "ON" or "OFF")
 end)
-newButton("KeyToString", function() return string.format("[%s] [BETA] KeyToString", keyToString and "ENABLED" or "DISABLED") end, function()
-	keyToString = not keyToString
-	TextLabel.Text = string.format("[%s] KeyToString", keyToString and "ENABLED" or "DISABLED")
+newButton("KeyToString", function() return string.format("[%s] KeyToString (BETA)", keyToString and "ON" or "OFF") end, function()
+	keyToString = not keyToString; TextLabel.Text = string.format("[%s] KeyToString", keyToString and "ON" or "OFF")
 end)
-newButton("ReturnValues", function() return string.format("[%s] [EXPERIMENTAL] Record return values", recordReturnValues and "ENABLED" or "DISABLED") end, function()
-	recordReturnValues = not recordReturnValues
-	TextLabel.Text = string.format("[%s] ReturnValues", recordReturnValues and "ENABLED" or "DISABLED")
+newButton("ReturnValues", function() return string.format("[%s] Record return values", recordReturnValues and "ON" or "OFF") end, function()
+	recordReturnValues = not recordReturnValues; TextLabel.Text = string.format("[%s] ReturnValues", recordReturnValues and "ON" or "OFF")
 end)
-newButton("GetReturnValue", function() return "[Experimental] Show recorded return value" end, function()
+newButton("GetReturnValue", function() return "Show recorded return value" end, function()
 	if selected then codebox:setRaw(SimpleSpy:ValueToVar(selected.ReturnValue, "returnValue")) end
 end)
