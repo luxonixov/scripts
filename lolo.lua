@@ -671,12 +671,13 @@ function mouseEntered()
 	end
 	local customCursor = Instance.new("ImageLabel")
 	customCursor.Name = "Cursor"
-	customCursor.Size = UDim2.fromOffset(200, 200)
-	customCursor.ZIndex = 1e5
-	customCursor.BackgroundTransparency = 1
-	customCursor.Image = ""
-	customCursor.Parent = SimpleSpy2
-	UserInputService.OverrideMouseIconBehavior = Enum.OverrideMouseIconBehavior.ForceHide
+customCursor.Size = UDim2.fromOffset(200, 200)
+customCursor.ZIndex = 1e5
+customCursor.BackgroundTransparency = 1
+customCursor.Active = false
+customCursor.Selectable = false
+customCursor.Image = ""
+customCursor.Parent = SimpleSpy2	UserInputService.OverrideMouseIconBehavior = Enum.OverrideMouseIconBehavior.ForceHide
 	RunService:BindToRenderStep("SIMPLESPY_CURSOR", 1, function()
 		if mouseInGui and _G.SimpleSpyExecuted then
 			local mouseLocation = UserInputService:GetMouseLocation() - Vector2.new(0, 36)
