@@ -152,12 +152,13 @@ local btnSurv = makeSmallBtn("Выжив.", 78,   152)
 local btnKill = makeSmallBtn("Убийца", 148,  152)
 
 local btn4 = makeToggle("Картофельная графика", 182)
-local btn5 = makeToggle("Скорость",             216)
-local btn6 = makeToggle("ESP Items",            250)
+local btn7 = makeToggle("Авто починка",         216)
+local btn5 = makeToggle("Скорость",             250)
+local btn6 = makeToggle("ESP Items",            284)
 
 local sLabel = Instance.new("TextLabel")
 sLabel.Size = UDim2.new(1, -16, 0, 14)
-sLabel.Position = UDim2.new(0, 8, 0, 284)
+sLabel.Position = UDim2.new(0, 8, 0, 318)
 sLabel.BackgroundTransparency = 1
 sLabel.Text = "Скорость: " .. currentSpeed
 sLabel.Font = Enum.Font.Gotham
@@ -168,7 +169,7 @@ sLabel.Parent = Frame
 
 local sBg = Instance.new("Frame")
 sBg.Size = UDim2.new(1, -16, 0, 10)
-sBg.Position = UDim2.new(0, 8, 0, 302)
+sBg.Position = UDim2.new(0, 8, 0, 336)
 sBg.BackgroundColor3 = Color3.fromRGB(35,35,60)
 sBg.BorderSizePixel = 0
 sBg.Parent = Frame
@@ -281,7 +282,6 @@ local function applyESPToPlayer(plr)
     hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     hl.Adornee = char; hl.Parent = char
 
-    -- ищем любую BasePart в голове если Head не найден
     local head = char:FindFirstChild("Head") or char:FindFirstChildWhichIsA("BasePart")
     local bb, lbl
     if head then
@@ -317,6 +317,23 @@ local function applyPotato()
     else settings().Rendering.QualityLevel = origQuality end
 end
 btn4.MouseButton1Click:Connect(function() states.potato = not states.potato; setActive(btn4, states.potato); applyPotato() end)
+
+local function doRepair()
+    pcall(function()
+        local args = {
+            [1] = {
+                ["Wires"] = true,
+                ["Switches"] = true,
+                ["Lever"] = true
+            }
+        }
+        LocalPlayer.PlayerGui.Gen.GeneratorMain.Event:FireServer(unpack(args))
+    end)
+end
+
+btn7.MouseButton1Click:Connect(function()
+    doRepair()
+end)
 
 btn5.MouseButton1Click:Connect(function() states.speed = not states.speed; setActive(btn5, states.speed) end)
 
