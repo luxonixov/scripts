@@ -1,4 +1,4 @@
--- Script by luxonixov | t.me/luxonixov
+-- script by luxonixov | t.me/luxonixov
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
 local RunService = game:GetService("RunService")
@@ -14,6 +14,11 @@ local origBrightness = Lighting.Brightness
 local origQuality = settings().Rendering.QualityLevel
 local currentSpeed = 24
 local slidDragging = false
+
+local repairTime = 2
+local repairCount = 4
+local genCooldown = 3
+local autoRepairRunning = false
 
 local function isMurderer(plr)
     local char = plr.Character
@@ -40,7 +45,6 @@ ToggleBtn.Parent = ScreenGui
 Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 5)
 
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 220, 0, 390)
 Frame.Position = UDim2.new(0, 10, 0, 44)
 Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
 Frame.BorderSizePixel = 0
@@ -52,7 +56,7 @@ stroke.Color = Color3.fromRGB(80, 80, 160)
 stroke.Thickness = 1.2
 
 local TitleBar = Instance.new("Frame")
-TitleBar.Size = UDim2.new(1, 0, 0, 28)
+TitleBar.Size = UDim2.new(1, 0, 0, 24)
 TitleBar.BackgroundColor3 = Color3.fromRGB(35, 35, 60)
 TitleBar.BorderSizePixel = 0
 TitleBar.Parent = Frame
@@ -64,7 +68,7 @@ TitleLbl.Position = UDim2.new(0, 10, 0, 0)
 TitleLbl.BackgroundTransparency = 1
 TitleLbl.Text = "Script Menu"
 TitleLbl.Font = Enum.Font.GothamBold
-TitleLbl.TextSize = 12
+TitleLbl.TextSize = 11
 TitleLbl.TextColor3 = Color3.fromRGB(180, 180, 255)
 TitleLbl.TextXAlignment = Enum.TextXAlignment.Left
 TitleLbl.Parent = TitleBar
@@ -91,21 +95,24 @@ UserInputService.InputChanged:Connect(function(input)
 end)
 ToggleBtn.MouseButton1Click:Connect(function() Frame.Visible = not Frame.Visible end)
 
-local function makeToggle(text, yOffset)
+local curY = 28
+local W = 200
+
+local function makeToggle(text)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -16, 0, 28)
-    btn.Position = UDim2.new(0, 8, 0, yOffset)
+    btn.Size = UDim2.new(0, W-16, 0, 24)
+    btn.Position = UDim2.new(0, 8, 0, curY)
     btn.BackgroundColor3 = Color3.fromRGB(35, 35, 60)
     btn.TextColor3 = Color3.fromRGB(170, 170, 220)
     btn.Text = "o  " .. text
     btn.Font = Enum.Font.Gotham
-    btn.TextSize = 11
+    btn.TextSize = 10
     btn.TextXAlignment = Enum.TextXAlignment.Left
     btn.BorderSizePixel = 0
     btn.Parent = Frame
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-    local s = Instance.new("UIStroke", btn)
-    s.Color = Color3.fromRGB(60, 60, 100); s.Thickness = 1
+    local s = Instance.new("UIStroke", btn); s.Color = Color3.fromRGB(60,60,100); s.Thickness = 1
+    curY = curY + 26
     return btn
 end
 
@@ -115,10 +122,10 @@ local function setActive(btn, on)
     btn.Text = (on and "*  " or "o  ") .. btn.Text:sub(4)
 end
 
-local function makeSmallBtn(text, x, y)
+local function makeSmallBtn(text, x, w)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 62, 0, 22)
-    btn.Position = UDim2.new(0, x, 0, y)
+    btn.Size = UDim2.new(0, w, 0, 20)
+    btn.Position = UDim2.new(0, x, 0, curY)
     btn.BackgroundColor3 = Color3.fromRGB(35, 35, 60)
     btn.TextColor3 = Color3.fromRGB(170, 170, 220)
     btn.Text = text
@@ -127,104 +134,136 @@ local function makeSmallBtn(text, x, y)
     btn.BorderSizePixel = 0
     btn.Parent = Frame
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
-    local s = Instance.new("UIStroke", btn)
-    s.Color = Color3.fromRGB(60, 60, 100); s.Thickness = 1
+    local s = Instance.new("UIStroke", btn); s.Color = Color3.fromRGB(60,60,100); s.Thickness = 1
     return btn
 end
 
-local btn1 = makeToggle("Убрать туман",         34)
-local btn2 = makeToggle("Полное освещение",      68)
-local btn3 = makeToggle("ESP",                  102)
+local function makeSliderRow(labelText, initVal, minVal, maxVal, decimals, onChange)
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(0, W-16, 0, 12)
+    lbl.Position = UDim2.new(0, 8, 0, curY)
+    lbl.BackgroundTransparency = 1
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextSize = 9
+    lbl.TextColor3 = Color3.fromRGB(120,120,180)
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = Frame
+    curY = curY + 13
 
-local modeLbl = Instance.new("TextLabel")
-modeLbl.Size = UDim2.new(1, -16, 0, 14)
-modeLbl.Position = UDim2.new(0, 8, 0, 136)
-modeLbl.BackgroundTransparency = 1
-modeLbl.Text = "Режим ESP:"
-modeLbl.Font = Enum.Font.Gotham
-modeLbl.TextSize = 10
-modeLbl.TextColor3 = Color3.fromRGB(120,120,180)
-modeLbl.TextXAlignment = Enum.TextXAlignment.Left
-modeLbl.Parent = Frame
+    local bg = Instance.new("Frame")
+    bg.Size = UDim2.new(0, W-16, 0, 8)
+    bg.Position = UDim2.new(0, 8, 0, curY)
+    bg.BackgroundColor3 = Color3.fromRGB(35,35,60)
+    bg.BorderSizePixel = 0
+    bg.Parent = Frame
+    Instance.new("UICorner", bg).CornerRadius = UDim.new(0,4)
 
-local btnAll  = makeSmallBtn("Все",     8,   152)
-local btnSurv = makeSmallBtn("Выжив.", 78,   152)
-local btnKill = makeSmallBtn("Убийца", 148,  152)
+    local fill = Instance.new("Frame")
+    local initX = (initVal - minVal) / (maxVal - minVal)
+    fill.Size = UDim2.new(initX, 0, 1, 0)
+    fill.BackgroundColor3 = Color3.fromRGB(80,120,220)
+    fill.BorderSizePixel = 0
+    fill.Parent = bg
+    Instance.new("UICorner", fill).CornerRadius = UDim.new(0,4)
 
-local btn4 = makeToggle("Картофельная графика", 182)
-local btn7 = makeToggle("Авто починка",         216)
-local btn5 = makeToggle("Скорость",             250)
-local btn6 = makeToggle("ESP Items",            284)
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.new(0, 14, 0, 14)
+    knob.Position = UDim2.new(initX, -7, 0.5, -7)
+    knob.BackgroundColor3 = Color3.fromRGB(140,180,255)
+    knob.BorderSizePixel = 0
+    knob.Parent = bg
+    Instance.new("UICorner", knob).CornerRadius = UDim.new(1,0)
 
-local sLabel = Instance.new("TextLabel")
-sLabel.Size = UDim2.new(1, -16, 0, 14)
-sLabel.Position = UDim2.new(0, 8, 0, 318)
-sLabel.BackgroundTransparency = 1
-sLabel.Text = "Скорость: " .. currentSpeed
-sLabel.Font = Enum.Font.Gotham
-sLabel.TextSize = 10
-sLabel.TextColor3 = Color3.fromRGB(120,120,180)
-sLabel.TextXAlignment = Enum.TextXAlignment.Left
-sLabel.Parent = Frame
+    curY = curY + 16
 
-local sBg = Instance.new("Frame")
-sBg.Size = UDim2.new(1, -16, 0, 10)
-sBg.Position = UDim2.new(0, 8, 0, 336)
-sBg.BackgroundColor3 = Color3.fromRGB(35,35,60)
-sBg.BorderSizePixel = 0
-sBg.Parent = Frame
-Instance.new("UICorner", sBg).CornerRadius = UDim.new(0, 5)
+    local function fmt(v)
+        if decimals == 0 then return tostring(math.floor(v))
+        else return string.format("%." .. decimals .. "f", v) end
+    end
 
-local sFill = Instance.new("Frame")
-local initX = (currentSpeed - 1) / 99
-sFill.Size = UDim2.new(initX, 0, 1, 0)
-sFill.BackgroundColor3 = Color3.fromRGB(80,120,220)
-sFill.BorderSizePixel = 0
-sFill.Parent = sBg
-Instance.new("UICorner", sFill).CornerRadius = UDim.new(0, 5)
+    lbl.Text = labelText .. fmt(initVal)
 
-local sKnob = Instance.new("Frame")
-sKnob.Size = UDim2.new(0, 16, 0, 16)
-sKnob.Position = UDim2.new(initX, -8, 0.5, -8)
-sKnob.BackgroundColor3 = Color3.fromRGB(140,180,255)
-sKnob.BorderSizePixel = 0
-sKnob.Parent = sBg
-Instance.new("UICorner", sKnob).CornerRadius = UDim.new(1, 0)
+    local function updateVal(input)
+        local x = math.clamp((input.Position.X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X, 0, 1)
+        fill.Size = UDim2.new(x, 0, 1, 0)
+        knob.Position = UDim2.new(x, -7, 0.5, -7)
+        local raw = minVal + x * (maxVal - minVal)
+        local val
+        if decimals == 0 then val = math.floor(raw + 0.5)
+        else val = math.floor(raw * 10 + 0.5) / 10 end
+        lbl.Text = labelText .. fmt(val)
+        onChange(val)
+    end
 
-local function updateSlider(input)
-    local x = math.clamp((input.Position.X - sBg.AbsolutePosition.X) / sBg.AbsoluteSize.X, 0, 1)
-    sFill.Size = UDim2.new(x, 0, 1, 0)
-    sKnob.Position = UDim2.new(x, -8, 0.5, -8)
-    currentSpeed = math.floor(1 + x * 99)
-    sLabel.Text = "Скорость: " .. currentSpeed
+    local active = false
+    bg.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+            active = true; slidDragging = true; updateVal(i)
+        end
+    end)
+    knob.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+            active = true; slidDragging = true
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(i)
+        if active and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+            updateVal(i)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+            active = false; slidDragging = false
+        end
+    end)
 end
 
-sBg.InputBegan:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-        slidDragging = true; updateSlider(i)
-    end
-end)
-sKnob.InputBegan:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-        slidDragging = true
-    end
-end)
-UserInputService.InputChanged:Connect(function(i)
-    if slidDragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
-        updateSlider(i)
-    end
-end)
-UserInputService.InputEnded:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-        slidDragging = false
-    end
-end)
+local function makeSep()
+    local sep = Instance.new("Frame")
+    sep.Size = UDim2.new(0, W-16, 0, 1)
+    sep.Position = UDim2.new(0, 8, 0, curY)
+    sep.BackgroundColor3 = Color3.fromRGB(60,60,100)
+    sep.BorderSizePixel = 0
+    sep.Parent = Frame
+    curY = curY + 5
+end
 
+-- кнопки основные
+local btn1 = makeToggle("Убрать туман")
+local btn2 = makeToggle("Полное освещение")
+local btn3 = makeToggle("ESP")
+
+local btnAll  = makeSmallBtn("Все",    8,  56)
+local btnSurv = makeSmallBtn("Выжив.",68,  56)
+local btnKill = makeSmallBtn("Убийца",128, 56)
+curY = curY + 24
+
+local btn4 = makeToggle("Картофельная графика")
+local btn5 = makeToggle("Скорость")
+
+makeSliderRow("Скорость: ", currentSpeed, 1, 100, 0, function(v) currentSpeed = v end)
+
+makeSep()
+
+local btn7 = makeToggle("Авто фарм")
+
+makeSliderRow("Время 1 починки: ", repairTime, 1, 5, 1, function(v) repairTime = v end)
+makeSliderRow("Кол-во починок: ", repairCount, 2, 8, 0, function(v) repairCount = v end)
+makeSliderRow("КД между ген: ", genCooldown, 3, 6, 1, function(v) genCooldown = v end)
+
+makeSep()
+
+local btn6 = makeToggle("ESP Items")
+
+curY = curY + 4
+Frame.Size = UDim2.new(0, W, 0, curY)
+
+-- ESP режим кнопки
 local function updateModeButtons()
-    local function hi(btn, mode)
+    local function hi(b, mode)
         local on = states.espMode == mode
-        btn.BackgroundColor3 = on and Color3.fromRGB(50,50,100) or Color3.fromRGB(35,35,60)
-        btn.TextColor3 = on and Color3.fromRGB(140,200,255) or Color3.fromRGB(170,170,220)
+        b.BackgroundColor3 = on and Color3.fromRGB(50,50,100) or Color3.fromRGB(35,35,60)
+        b.TextColor3 = on and Color3.fromRGB(140,200,255) or Color3.fromRGB(170,170,220)
     end
     hi(btnAll,"all"); hi(btnSurv,"survivors"); hi(btnKill,"murderer")
 end
@@ -281,7 +320,6 @@ local function applyESPToPlayer(plr)
     hl.FillTransparency = 0.35; hl.OutlineTransparency = 0
     hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     hl.Adornee = char; hl.Parent = char
-
     local head = char:FindFirstChild("Head") or char:FindFirstChildWhichIsA("BasePart")
     local bb, lbl
     if head then
@@ -318,6 +356,18 @@ local function applyPotato()
 end
 btn4.MouseButton1Click:Connect(function() states.potato = not states.potato; setActive(btn4, states.potato); applyPotato() end)
 
+btn5.MouseButton1Click:Connect(function() states.speed = not states.speed; setActive(btn5, states.speed) end)
+
+RunService.Heartbeat:Connect(function()
+    if not states.speed then return end
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local hum  = char and char:FindFirstChildOfClass("Humanoid")
+    if root and hum and hum.MoveDirection.Magnitude > 0 then
+        root.CFrame = root.CFrame + (hum.MoveDirection * (currentSpeed / 45))
+    end
+end)
+
 local function doRepair()
     pcall(function()
         local args = {
@@ -331,19 +381,54 @@ local function doRepair()
     end)
 end
 
+local function autoRepairAll()
+    if autoRepairRunning then return end
+    autoRepairRunning = true
+    setActive(btn7, true)
+
+    local generators = workspace:FindFirstChild("MAPS")
+        and workspace.MAPS:FindFirstChild("GAME MAP")
+        and workspace.MAPS["GAME MAP"]:FindFirstChild("Generators")
+
+    if generators then
+        for _, gen in pairs(generators:GetChildren()) do
+            if not autoRepairRunning then break end
+
+            local char = LocalPlayer.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            local part = gen:FindFirstChildWhichIsA("BasePart")
+
+            if root and part then
+                root.CFrame = part.CFrame * CFrame.new(0, 0, 3)
+                task.wait(0.4)
+
+                local prompt = gen:FindFirstChildWhichIsA("ProximityPrompt", true)
+                if prompt then
+                    pcall(fireproximityprompt, prompt)
+                    task.wait(0.3)
+                end
+
+                for i = 1, repairCount do
+                    if not autoRepairRunning then break end
+                    doRepair()
+                    task.wait(repairTime)
+                end
+
+                task.wait(genCooldown)
+            end
+        end
+    end
+
+    autoRepairRunning = false
+    setActive(btn7, false)
+end
+
 btn7.MouseButton1Click:Connect(function()
-    doRepair()
-end)
-
-btn5.MouseButton1Click:Connect(function() states.speed = not states.speed; setActive(btn5, states.speed) end)
-
-RunService.Heartbeat:Connect(function()
-    if not states.speed then return end
-    local char = LocalPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    local hum  = char and char:FindFirstChildOfClass("Humanoid")
-    if root and hum and hum.MoveDirection.Magnitude > 0 then
-        root.CFrame = root.CFrame + (hum.MoveDirection * (currentSpeed / 45))
+    if autoRepairRunning then
+        autoRepairRunning = false
+        setActive(btn7, false)
+    else
+        coroutine.wrap(autoRepairAll)()
     end
 end)
 
