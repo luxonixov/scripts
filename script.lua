@@ -15,11 +15,6 @@ local origQuality = settings().Rendering.QualityLevel
 local currentSpeed = 24
 local slidDragging = false
 
-local repairTime = 2
-local repairCount = 4
-local genCooldown = 3
-local autoRepairRunning = false
-
 local function isMurderer(plr)
     local char = plr.Character
     if not char then return false end
@@ -245,11 +240,7 @@ makeSliderRow("Скорость: ", currentSpeed, 1, 100, 0, function(v) current
 
 makeSep()
 
-local btn7 = makeToggle("Авто фарм")
-
-makeSliderRow("Время 1 починки: ", repairTime, 1, 5, 1, function(v) repairTime = v end)
-makeSliderRow("Кол-во починок: ", repairCount, 2, 8, 0, function(v) repairCount = v end)
-makeSliderRow("КД между ген: ", genCooldown, 3, 6, 1, function(v) genCooldown = v end)
+local btn7 = makeToggle("Починить генератор")
 
 makeSep()
 
@@ -381,55 +372,8 @@ local function doRepair()
     end)
 end
 
-local function autoRepairAll()
-    if autoRepairRunning then return end
-    autoRepairRunning = true
-    setActive(btn7, true)
-
-    local generators = workspace:FindFirstChild("MAPS")
-        and workspace.MAPS:FindFirstChild("GAME MAP")
-        and workspace.MAPS["GAME MAP"]:FindFirstChild("Generators")
-
-    if generators then
-        for _, gen in pairs(generators:GetChildren()) do
-            if not autoRepairRunning then break end
-
-            local char = LocalPlayer.Character
-            local root = char and char:FindFirstChild("HumanoidRootPart")
-            local part = gen:FindFirstChildWhichIsA("BasePart")
-
-            if root and part then
-                root.CFrame = part.CFrame * CFrame.new(0, 0, 3)
-                task.wait(0.4)
-
-                local prompt = gen:FindFirstChildWhichIsA("ProximityPrompt", true)
-                if prompt then
-                    pcall(fireproximityprompt, prompt)
-                    task.wait(0.3)
-                end
-
-                for i = 1, repairCount do
-                    if not autoRepairRunning then break end
-                    doRepair()
-                    task.wait(repairTime)
-                end
-
-                task.wait(genCooldown)
-            end
-        end
-    end
-
-    autoRepairRunning = false
-    setActive(btn7, false)
-end
-
 btn7.MouseButton1Click:Connect(function()
-    if autoRepairRunning then
-        autoRepairRunning = false
-        setActive(btn7, false)
-    else
-        coroutine.wrap(autoRepairAll)()
-    end
+    doRepair()
 end)
 
 local function removeAllItemESP()
